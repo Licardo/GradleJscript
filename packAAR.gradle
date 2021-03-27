@@ -1,0 +1,122 @@
+def readAllModuleDep() {
+    // 依赖查找
+    def depMap = [:]
+    sourceModules.each { String moduleName ->
+        def depType = [JavaPlugin.API_CONFIGURATION_NAME, JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME]
+        def deps = []
+        rootProject.childProjects[moduleName].configurations.findAll {
+            depType.contains(it.name)
+        }.collect{
+            it.dependencies.all {
+                List modules = curModules()
+                if (modules.contains(it.name)) {
+                    deps.push it.name
+                }
+            }
+        }
+        depMap.put(moduleName, deps)
+    }
+    depMap.remove("app")
+    println("@$depMap")
+    return depMap
+}
+
+def parseDepData(Map<String, List> depMap, List modules,  List outModules) {
+    for (String module: modules) {
+        def nodes = depMap.findAll {key, value->value.contains(module)}.keySet()
+        if (nodes.isEmpty()) {
+            if (!outModules.contains(module)){
+                outModules.add(module)
+            }
+            continue
+        }
+        parseDepData(depMap, nodes.toList(), outModules)
+        if (!outModules.contains(module)) {
+            outModules.add(module)
+        }
+    }
+}
+
+task packageDependency {
+    doLast {
+        def depMap = readAllModuleDep()
+        def module = []
+        if (project.hasProperty("N")){
+            def param = project.property("N")
+            if (param == "") {
+                module.addAll(sourceModules)
+            } else {
+                module.add(param)
+            }
+            // 获取所有父依赖的列表
+            def nodes = []
+            parseDepData(depMap, module, nodes)
+            nodes.reverse(true)
+            println("---------------------依赖分析完成，$module 的所有父依赖--------------------------")
+            println(nodes)
+            println("-----------------------------------------------------------------------------")
+            // 遍历依赖列表，修改依赖模块的版本号
+//            setModuleAARVersion(nodes)
+            // 遍历依赖列表，开启打包任务
+            println("-------------------------父依赖模块的打包任务开始执行-----------------------------")
+            nodes.each {
+                // 遍历依赖列表，修改依赖模块的版本号
+                setModuleAARVersion([it])
+                def command = "./gradlew :$it:testUpload"
+                def execute = command.execute()
+                def content = execute.in.text
+                def error = execute.err.text
+                println(">>>$content")
+                if (error != '') {
+                    println(">>>$error")
+                    if (error.contains('BUILD FAILED')) {
+                        throw new GradleException(">>>$it 模块打包失败：$error, 依赖列表：$nodes")
+                    }
+                }
+                println(">>>$it 模块的打包任务执行完成")
+            }
+            println(">>>所有模块的打包任务已完成")
+        }
+    }
+}
+
+def setModuleAARVersion(List<String> nodes) {
+    File configFile = new File("$rootDir/$scriptDir/wmModuleMavenUrl.gradle")
+    if (!configFile.exists()) {
+        throw new GradleException('>>>没有生成wmModuleMavenUrl文件，需要开发者手动创建文件')
+    }
+    StringBuilder content = new StringBuilder()
+    configFile.eachLine {
+        line ->
+            def module = line.split(':')
+            if (module.size() > 3) {
+                def name = module[0]
+                def key = name.split('"')[1]
+                if (nodes.contains(key)) {
+                    def version = module[3]
+                    // 获取名称
+                    def value = version.split('"')[0]
+                    // 修改内容
+                    def newVer = makeVersion()
+                    def l = line.replace(value, newVer)
+                    content.append("$l\n")
+                } else {
+                    content.append("$line\n")
+                }
+            } else {
+                content.append("$line\n")
+            }
+    }
+    configFile.delete()
+    def printWriter = configFile.newPrintWriter()
+    printWriter.write(content.toString())
+    printWriter.flush()
+    printWriter.close()
+    println(">>>版本号修改后的文件内容：")
+    println(">>>$content")
+}
+
+// 制定版本规则
+def makeVersion() {
+    '泡饭'
+}

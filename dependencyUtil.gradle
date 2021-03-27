@@ -1,0 +1,64 @@
+ext.wmImplementation = {
+    List<String> modules ->
+        modules.each {
+            addDependencies(dependencies, it, JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME)
+        }
+}
+ext.wmApi = {
+    List<String> modules ->
+        modules.each {
+            addDependencies(dependencies, it, JavaPlugin.API_CONFIGURATION_NAME)
+        }
+}
+ext.wmCompileOnly = {
+    List<String> modules ->
+        modules.each {
+            addDependencies(dependencies, it, JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME)
+        }
+}
+
+def addDependencies(DependencyHandler dependencyHandler, String module, String config) {
+    if (sourceModules.contains(module)) {
+        // 源码依赖
+        dependencyHandler.add(config, dependencyHandler.project(path: ":$module"))
+    } else if (aarModules.contains(module)) {
+        // maven依赖
+        if (Libs[module] != null) {
+            dependencyHandler.add(config, Libs[module])
+        } else {
+            throw new GradleException("$module 模块没有对应的maven包")
+        }
+    } else {
+        // 卸载模块
+        println("卸载了$module 模块")
+    }
+}
+
+// 读取配置文件
+def readConfig() {
+    def sources = []
+    def aars = []
+    // 读取模块配置文件
+    File configFile = new File("$rootDir/$scriptDir/modules")
+    configFile.eachLine {
+        def line = it.split('=')
+        if (line.size() > 1) {
+            def name = line[0]
+            def value = line[1]
+            if (value == '1') {
+                sources.add(name)
+            } else if (value == '2'){
+                aars.add(name)
+            }
+        }
+    }
+    [sources, aars]
+}
+ext.sourceModules=readConfig()[0]
+ext.aarModules=readConfig()[1]
+ext.curModules={
+    def modules = []
+    modules.addAll(sourceModules)
+    modules.addAll(aarModules)
+    modules
+}

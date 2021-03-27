@@ -1,0 +1,4 @@
+ext.Libs = [
+        "lib_h5"            : "com.paofan.module:lib-h5:0.0.1-SNAPSHOT",
+        "lib_login"         : "com.paofan.module:lib_login:0.0.1-SNAPSHOT"
+]

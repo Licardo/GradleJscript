@@ -1,0 +1,157 @@
+apply from: "$rootDir/$scriptDir/doraemon.gradle"
+ext.isApplication = getName() == "$mainModule"
+ext.commonConfig = {
+    importPlugin()
+    setAndroidConfig()
+    if (isApplication) {
+        dokit()
+    }
+    setTask()
+}
+def importPlugin() {
+    if (isApplication) {
+        apply plugin: 'com.android.application'
+    } else {
+        apply plugin: 'com.android.library'
+    }
+}
+def setAndroidConfig() {
+    apply plugin: 'kotlin-android'
+    apply plugin: 'kotlin-kapt'
+    apply plugin: 'maven'
+    apply plugin: 'com.ichoice.plugin'
+    def configInfo = rootProject.ext.android
+
+    android {
+        compileSdkVersion 28
+        buildToolsVersion "28.0.3"
+
+        defaultConfig {
+            minSdkVersion 21
+            targetSdkVersion 28
+            versionCode 1
+            versionName "1.0"
+
+            testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+            consumerProguardFiles "consumer-rules.pro"
+
+            javaCompileOptions {
+                annotationProcessorOptions {
+                    arguments = [ moduleName : project.getName() ]
+                }
+            }
+            kapt {
+                arguments {
+                    arg("AROUTER_MODULE_NAME", project.getName())
+                }
+            }
+
+            // 自定义 int 型版本号, 便于项目中直接获取, 提高效率
+            buildConfigField "int", "mVersionNameInt", "${configInfo.mainVersionNameInt}"
+            buildConfigField "String", "mVersionNameStr", "\"${configInfo.mainVersionNameStr}\""
+
+        }
+
+        buildTypes {
+            release {
+                minifyEnabled false
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            }
+        }
+
+        lintOptions {
+            abortOnError false
+        }
+
+        packagingOptions {
+            exclude 'META-INF/DEPENDENCIES.txt'
+            exclude 'META-INF/LICENSE.txt'
+            exclude 'META-INF/NOTICE.txt'
+            exclude 'META-INF/NOTICE'
+            exclude 'META-INF/LICENSE'
+            exclude 'META-INF/DEPENDENCIES'
+            exclude 'META-INF/notice.txt'
+            exclude 'META-INF/license.txt'
+            exclude 'META-INF/dependencies.txt'
+            exclude 'META-INF/LGPL2.1'
+        }
+
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_1_8
+            targetCompatibility JavaVersion.VERSION_1_8
+        }
+    }
+    wmShrink {
+        // 是否开启插件功能
+        enable = true
+        // 设置大图的最小体积
+        largeSize = 100 * 100
+        // 设置大图的最小宽高
+        largeHeight = 100
+        largeWidth = 100
+        // 图片处理工具的位置
+        toolsDir = '/shrinkPlugin/imageTools/'
+        // 是否开启图片大小检查
+        isCheckSize = true
+        // 是否开启图片宽高检查
+        isCheckPixels = true
+        // 是否开启重复图片检查
+        isCheckRepeat = true
+        // 是否开启图片全量压缩
+        isShrink = true
+        // 图片处理方式 Compress：压缩，ConvertWebp：转webp格式
+        optimizeType = 'ConvertWebp'
+        // 白名单，白名单内的图片不会压缩，不会被检测重复和大图
+        whiteList = []
+    }
+}
+
+def setTask() {
+    task androidSourcesJar(type: Jar) {
+        archiveClassifier = 'sources'
+        from android.sourceSets.main.java.sourceFiles
+    }
+    artifacts {
+        // archives sourcesJar
+        archives androidSourcesJar
+    }
+    uploadArchives {
+        repositories.mavenDeployer {
+            repository(url:getRepositoryUrl(groupInfo()[2])) {
+                authentication(userName:"android", password:"ichoice411")
+            }
+            pom.version=groupInfo()[2]
+            pom.artifactId=groupInfo()[1]
+            pom.groupId=groupInfo()[0]
+        }
+    }
+
+    task testUpload {
+        doLast {
+//        if (project.getName() == 'wmp_domain') {
+//            throw new GradleException("故意抛出个错误")
+//        }
+            if (groupInfo()[0] == '') {
+                throw new GradleException("${project.getName()}没有对应的aar依赖，需要开发者添加到wmModuleMavenUrl.gradle中")
+            }
+            println("########${project.getName()}:${groupInfo()[0]}:${groupInfo()[1]}:${groupInfo()[2]}}")
+        }
+    }
+}
+
+def groupInfo() {
+    def key = getName()
+    String url = Libs[key]
+    if (url == null) {
+        return ["", "", ""]
+    }
+    return url.split(':')
+}
+
+def getRepositoryUrl(String version) {
+    if (version.contains("SNAPSHOT")) {
+        return "http://$host/repository/android-maven-snapshots/"
+    } else {
+        return "http://$host/repository/android-maven-releases/"
+    }
+}
