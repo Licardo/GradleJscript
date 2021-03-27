@@ -41,23 +41,13 @@ sourceModules.each {
 // 配置模式为：模块名=0/1/2   0:表示卸载模块 1:表示源码依赖，2：表示maven依赖
 // 业务模块
 app=1
-wmp_user=1
-wmp_domain=1
-wmp_login=1
-wmp_h5=1
-wmp_fastmedical=1
-pdfreader=1
-ocr_ui=1
-faceplatform=1
-faceplatform-ui=1
+lib_login=1
+lib_h5=1
 // 基础模块
-lib_dokit=1
-lib_webview=1
 lib_share=1
-lib_imageload=1
-lib_wmagent=1
+lib_image=1
 lib_network=1
-wmp_base=1
+lib_base=1
 ```
 
 5. 如模块已部署maven仓库，wmMavenUrl.gradle文件中追加maven地址，格式：模块名=maven地址
